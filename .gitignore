@@ -1,0 +1,19 @@
+node_modules/
+**/node_modules/
+**/dist/
+**/.vite/
+**/.cache/
+**/*.log
+
+# Runtime data
+/data/
+/backend/data/
+*.sqlite
+*.sqlite3
+
+# Secrets
+.env
+
+# OS
+.DS_Store
+Thumbs.db

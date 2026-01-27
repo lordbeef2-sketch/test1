@@ -1,0 +1,12 @@
+{
+  "allowedAdGroup": "DOMAIN\\SomeSecurityGroup",
+  "detectedDomain": "",
+  "refreshSeconds": 30,
+  "pingTimeoutMs": 1000,
+  "concurrencyLimit": 25,
+  "tcpProbePort": 445,
+  "computers": [
+    { "computerName": "PC-001" },
+    { "computerName": "PC-002" }
+  ]
+}

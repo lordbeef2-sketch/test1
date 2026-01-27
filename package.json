@@ -1,0 +1,14 @@
+{
+  "name": "dlt",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "install:all": "npm install --workspaces",
+    "build": "npm run -w backend build && npm run -w frontend build",
+    "start": "npm run -w backend start",
+    "dev": "npm run -w backend dev"
+  }
+}

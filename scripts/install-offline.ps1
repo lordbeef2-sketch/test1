@@ -2,7 +2,6 @@
 param(
   [string]$ZipPath = "./DLT-offline-latest.zip",
   [string]$InstallDir = "C:\DLT",
-  [switch]$AllowInstallInZipFolder,
   [switch]$NoStart
 )
 
@@ -27,74 +26,36 @@ function New-RandomSecret([int]$Bytes = 48) {
 }
 
 $resolvedZip = (Resolve-Path -Path $ZipPath).Path
-$installRoot = (Resolve-Path -Path $InstallDir -ErrorAction SilentlyContinue)
-if (-not $installRoot) {
+if (-not (Test-Path -Path $InstallDir)) {
   New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-  $installRoot = (Resolve-Path -Path $InstallDir).Path
 }
-
-# Safety: if you install into the same folder that contains the zip, /MIR can delete the zip and installer.
-if (-not $AllowInstallInZipFolder) {
-  $zipFolder = (Split-Path -Parent $resolvedZip)
-  if ($zipFolder -eq $installRoot) {
-    throw "Refusing to install into the same folder as the zip ($installRoot). Choose a different -InstallDir, or pass -AllowInstallInZipFolder (not recommended)."
-  }
-}
+$installRoot = (Resolve-Path -Path $InstallDir).Path
 
 Write-Step "Extract bundle to a temp folder"
 $tempRoot = Join-Path $env:TEMP ("DLT-install-" + (Get-Date).ToString('yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
 Expand-Archive -Path $resolvedZip -DestinationPath $tempRoot -Force
 
-# The bundle may either:
-# 1) contain a single top-level folder, OR
-# 2) contain many top-level items (backend/, frontend/, node_modules/, etc.).
-$topDirs = @(Get-ChildItem -Path $tempRoot -Directory -ErrorAction SilentlyContinue)
-$topFiles = @(Get-ChildItem -Path $tempRoot -File -ErrorAction SilentlyContinue)
-if ($topDirs.Count -eq 1 -and $topFiles.Count -eq 0) {
-  $bundlePath = $topDirs[0].FullName
-} else {
-  $bundlePath = $tempRoot
+# Bundle zip contains a single folder at the root.
+$bundleFolder = Get-ChildItem -Path $tempRoot -Directory | Select-Object -First 1
+if (-not $bundleFolder) {
+  throw "Invalid bundle: no folder found in zip root."
 }
+$bundlePath = $bundleFolder.FullName
 
-Write-Step "Preserve existing config/data if present"
-$preserve = Join-Path $tempRoot "preserve"
-New-Item -ItemType Directory -Force -Path $preserve | Out-Null
+Write-Step "Extract app into install folder"
+# No robocopy. No mirroring. Just extract.
+Expand-Archive -Path $resolvedZip -DestinationPath $installRoot -Force
 
-$existingConfig = Join-Path $installRoot "config.json"
-if (Test-Path $existingConfig) {
-  Copy-Item -Force $existingConfig (Join-Path $preserve "config.json")
-}
-
-$existingBackendData = Join-Path $installRoot "backend\data"
-if (Test-Path $existingBackendData) {
-  robocopy $existingBackendData (Join-Path $preserve "backend-data") /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
-}
-
-$existingRootData = Join-Path $installRoot "data"
-if (Test-Path $existingRootData) {
-  robocopy $existingRootData (Join-Path $preserve "root-data") /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
-}
-
-Write-Step "Install (copy files into place)"
-robocopy $bundlePath $installRoot /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
-
-if (Test-Path (Join-Path $preserve "config.json")) {
-  Copy-Item -Force (Join-Path $preserve "config.json") $existingConfig
-}
-
-if (Test-Path (Join-Path $preserve "backend-data")) {
-  New-Item -ItemType Directory -Force -Path (Join-Path $installRoot "backend\data") | Out-Null
-  robocopy (Join-Path $preserve "backend-data") (Join-Path $installRoot "backend\data") /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
-}
-
-if (Test-Path (Join-Path $preserve "root-data")) {
-  New-Item -ItemType Directory -Force -Path (Join-Path $installRoot "data") | Out-Null
-  robocopy (Join-Path $preserve "root-data") (Join-Path $installRoot "data") /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
+# App root is the single folder that came out of the zip.
+$appRoot = Join-Path $installRoot (Split-Path -Leaf $bundlePath)
+if (-not (Test-Path -Path $appRoot)) {
+  # Fallback: if zip layout changes, assume install root is app root.
+  $appRoot = $installRoot
 }
 
 Write-Step "Ensure local secrets exist"
-$localEnv = Join-Path $installRoot "local.env.ps1"
+$localEnv = Join-Path $appRoot "local.env.ps1"
 if (-not (Test-Path $localEnv)) {
   $secret = New-RandomSecret
   $content = @(
@@ -106,12 +67,12 @@ if (-not (Test-Path $localEnv)) {
 }
 
 Write-Host "" 
-Write-Host "Installed to: $installRoot" -ForegroundColor Green
+Write-Host "Installed to: $appRoot" -ForegroundColor Green
 Write-Host "Next: run .\\start-backend.ps1" -ForegroundColor Green
 
 if (-not $NoStart) {
   Write-Step "Starting backend"
-  Push-Location $installRoot
+  Push-Location $appRoot
   Start-Process -FilePath powershell -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File .\\start-backend.ps1" | Out-Null
   Pop-Location
 }

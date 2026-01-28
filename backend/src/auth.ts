@@ -4,6 +4,8 @@ import type { AppConfig } from './config';
 import { hardDeny } from './lib/hardDeny';
 import { auditLog } from './lib/logger';
 import { isUserInGroup, resolveAllowedGroupDN } from './ad';
+import fs from 'node:fs';
+import path from 'node:path';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const SQLiteStore = require('connect-sqlite3')(session);
@@ -33,9 +35,10 @@ function requireSessionSecret(): string {
 }
 
 export function buildSessionMiddleware() {
-  const sessionDbPath = process.env.DLT_SESSION_DB_PATH || './data/sessions.sqlite';
-  const path = require('node:path');
+  const sessionDbPath = process.env.DLT_SESSION_DB_PATH || path.resolve(process.cwd(), 'data', 'sessions.sqlite');
   const cookieSecure = process.env.DLT_COOKIE_SECURE === 'true';
+
+  fs.mkdirSync(path.dirname(sessionDbPath), { recursive: true });
 
   return session({
     name: 'dlt.sid',

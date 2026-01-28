@@ -114,7 +114,9 @@ async function main() {
   app.use('/api', buildApiRouter(config, db, statusCache));
 
   // Serve frontend (only after auth)
-  const distDir = path.resolve(__dirname, '../../frontend/dist');
+  // Compute workspace root from both dev (src) and built (dist) layouts.
+  const workspaceRoot = path.resolve(__dirname, '..', '..', '..');
+  const distDir = path.resolve(workspaceRoot, 'frontend', 'dist');
   app.use(express.static(distDir, { fallthrough: true, index: false, etag: false, maxAge: 0 }));
 
   app.get('/', (_req, res) => {

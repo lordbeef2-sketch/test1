@@ -1,5 +1,6 @@
 import path from 'node:path';
 import Database from 'better-sqlite3';
+import fs from 'node:fs';
 
 export type CheckoutRow = {
   computerName: string;
@@ -19,11 +20,13 @@ export type CheckoutRecord = {
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function getDbPath(): string {
-  return process.env.DLT_DB_PATH || path.resolve(__dirname, '../../data/dlt.sqlite');
+  // Default assumes server is started from the backend folder.
+  return process.env.DLT_DB_PATH || path.resolve(process.cwd(), 'data', 'dlt.sqlite');
 }
 
 export function openDb(): Database.Database {
   const dbPath = getDbPath();
+  fs.mkdirSync(path.dirname(dbPath), { recursive: true });
   const db = new Database(dbPath);
   db.pragma('journal_mode = WAL');
   db.pragma('synchronous = NORMAL');

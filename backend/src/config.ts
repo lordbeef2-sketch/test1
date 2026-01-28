@@ -25,7 +25,9 @@ const configSchema = z.object({
 export type AppConfig = z.infer<typeof configSchema>;
 
 export function getConfigPath(): string {
-  return process.env.DLT_CONFIG_PATH || path.resolve(__dirname, '../../config.json');
+  // Default assumes the server is started from the backend folder (recommended),
+  // so config.json lives one level up at the workspace root.
+  return process.env.DLT_CONFIG_PATH || path.resolve(process.cwd(), '..', 'config.json');
 }
 
 export async function loadConfig(): Promise<{ config: AppConfig; configPath: string }>

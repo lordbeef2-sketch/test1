@@ -67,6 +67,11 @@ Invoke-Step "Stage runtime files" {
     throw "node_modules not found. Run npm install first."
   }
   robocopy (Join-Path $repoRoot "node_modules") (Join-Path $stageDir "node_modules") /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
+
+  # Include installer alongside the bundle for convenience.
+  if (Test-Path (Join-Path $repoRoot "scripts\install-offline.ps1")) {
+    Copy-Item -Force -Path (Join-Path $repoRoot "scripts\install-offline.ps1") -Destination $stageDir
+  }
 }
 
 Invoke-Step "Write bundle start script" {
@@ -78,6 +83,16 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# Load locally generated env (created by install-offline.ps1)
+if (Test-Path -Path (Join-Path $PSScriptRoot 'local.env.ps1')) {
+  . (Join-Path $PSScriptRoot 'local.env.ps1')
+}
+
+if ([string]::IsNullOrWhiteSpace($env:DLT_SESSION_SECRET) -or $env:DLT_SESSION_SECRET.Length -lt 32) {
+  Write-Error "DLT_SESSION_SECRET is missing. Run install-offline.ps1 (it generates local.env.ps1), or set the env var manually."
+  exit 1
+}
+
 if ([string]::IsNullOrWhiteSpace($HostAddress)) {
   $HostAddress = "127.0.0.1"
 }
@@ -86,7 +101,12 @@ $env:PORT = "$Port"
 $env:HOST = $HostAddress
 
 Write-Host "Starting DLT backend on http://${HostAddress}:${Port} ..."
-node .\backend\dist\index.js
+Push-Location (Join-Path $PSScriptRoot 'backend')
+try {
+  node .\\dist\\index.js
+} finally {
+  Pop-Location
+}
 '@
 
   Set-Content -Path (Join-Path $stageDir "start-backend.ps1") -Value $startScript -Encoding UTF8

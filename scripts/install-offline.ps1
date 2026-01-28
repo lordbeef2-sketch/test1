@@ -2,6 +2,7 @@
 param(
   [string]$ZipPath = "./DLT-offline-latest.zip",
   [string]$InstallDir = "C:\DLT",
+  [switch]$AllowInstallInZipFolder,
   [switch]$NoStart
 )
 
@@ -32,17 +33,29 @@ if (-not $installRoot) {
   $installRoot = (Resolve-Path -Path $InstallDir).Path
 }
 
+# Safety: if you install into the same folder that contains the zip, /MIR can delete the zip and installer.
+if (-not $AllowInstallInZipFolder) {
+  $zipFolder = (Split-Path -Parent $resolvedZip)
+  if ($zipFolder -eq $installRoot) {
+    throw "Refusing to install into the same folder as the zip ($installRoot). Choose a different -InstallDir, or pass -AllowInstallInZipFolder (not recommended)."
+  }
+}
+
 Write-Step "Extract bundle to a temp folder"
 $tempRoot = Join-Path $env:TEMP ("DLT-install-" + (Get-Date).ToString('yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
 Expand-Archive -Path $resolvedZip -DestinationPath $tempRoot -Force
 
-# Bundle zip contains a single folder at the root.
-$bundleFolder = Get-ChildItem -Path $tempRoot -Directory | Select-Object -First 1
-if (-not $bundleFolder) {
-  throw "Invalid bundle: no folder found in zip root."
+# The bundle may either:
+# 1) contain a single top-level folder, OR
+# 2) contain many top-level items (backend/, frontend/, node_modules/, etc.).
+$topDirs = @(Get-ChildItem -Path $tempRoot -Directory -ErrorAction SilentlyContinue)
+$topFiles = @(Get-ChildItem -Path $tempRoot -File -ErrorAction SilentlyContinue)
+if ($topDirs.Count -eq 1 -and $topFiles.Count -eq 0) {
+  $bundlePath = $topDirs[0].FullName
+} else {
+  $bundlePath = $tempRoot
 }
-$bundlePath = $bundleFolder.FullName
 
 Write-Step "Preserve existing config/data if present"
 $preserve = Join-Path $tempRoot "preserve"

@@ -106,6 +106,10 @@ This bundle contains:
 2) Run PowerShell:
    - `./start-backend.ps1` (defaults to localhost:9191)
 
+## Requirements
+- The machine running the backend must have Active Directory access (domain-joined and able to reach a DC).
+- Set a real `allowedAdGroup` value in `config.json` before starting (the placeholder will cause the backend to fail closed).
+
 ## Optional
 - Bind address: set `$env:DLT_HOST` (default `127.0.0.1`)
 - Port: `./start-backend.ps1 -Port 9191`

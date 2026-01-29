@@ -1,8 +1,8 @@
 import type { Router } from 'express';
 import { z } from 'zod';
-import type Database from 'better-sqlite3';
 import type { AppConfig } from '../config';
 import { pollAllComputers } from '../monitor';
+import type { Db } from '../db';
 import { readCheckoutMap, upsertCheckout } from '../db';
 import { listAllowedGroupMembers, resolveAndValidateCheckoutUser } from '../ad';
 import { auditLog } from '../lib/logger';
@@ -12,7 +12,7 @@ const checkoutSchema = z.object({
   checkoutUser: z.string().max(256),
 });
 
-export function buildApiRouter(config: AppConfig, db: Database.Database, statusCache: StatusCache): Router {
+export function buildApiRouter(config: AppConfig, db: Db, statusCache: StatusCache): Router {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const express = require('express');
   const router = express.Router();

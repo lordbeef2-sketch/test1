@@ -1,6 +1,6 @@
 import path from 'node:path';
-import Database from 'better-sqlite3';
 import fs from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
 
 export type CheckoutRow = {
   computerName: string;
@@ -24,17 +24,20 @@ export function getDbPath(): string {
   return process.env.DLT_DB_PATH || path.resolve(process.cwd(), 'data', 'dlt.sqlite');
 }
 
-export function openDb(): Database.Database {
+export type Db = DatabaseSync;
+
+export function openDb(): Db {
   const dbPath = getDbPath();
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-  const db = new Database(dbPath);
-  db.pragma('journal_mode = WAL');
-  db.pragma('synchronous = NORMAL');
+  const db = new DatabaseSync(dbPath);
+  // Pragmas for durability/perf similar to previous better-sqlite3 setup.
+  db.exec("PRAGMA journal_mode = WAL;");
+  db.exec("PRAGMA synchronous = NORMAL;");
   migrate(db);
   return db;
 }
 
-function migrate(db: Database.Database): void {
+function migrate(db: Db): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS checkout (
       computerName TEXT PRIMARY KEY,
@@ -46,13 +49,11 @@ function migrate(db: Database.Database): void {
   `);
 }
 
-export function readCheckoutMap(db: Database.Database): Map<string, CheckoutRecord> {
+export function readCheckoutMap(db: Db): Map<string, CheckoutRecord> {
   const now = Date.now();
   const rows = db
-    .prepare<[], CheckoutRow>(
-      'SELECT computerName, checkoutUser, lastUpdatedBy, lastUpdatedAtUtc FROM checkout'
-    )
-    .all();
+    .prepare('SELECT computerName, checkoutUser, lastUpdatedBy, lastUpdatedAtUtc FROM checkout')
+    .all() as CheckoutRow[];
 
   const result = new Map<string, CheckoutRecord>();
 
@@ -86,7 +87,7 @@ export function readCheckoutMap(db: Database.Database): Map<string, CheckoutReco
 }
 
 export function upsertCheckout(
-  db: Database.Database,
+  db: Db,
   computerName: string,
   checkoutUser: string,
   lastUpdatedBy: string

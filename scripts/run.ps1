@@ -20,16 +20,59 @@ function New-RandomSecret([int]$Bytes = 48) {
 }
 
 $root = $PSScriptRoot
+if ([string]::IsNullOrWhiteSpace($root)) { $root = (Get-Location).Path }
 
 if ([string]::IsNullOrWhiteSpace($HostAddress)) {
   $HostAddress = "127.0.0.1"
 }
 
+function Get-AppRoot([string]$scriptRoot) {
+  $candidate = $scriptRoot
+  $entry = Join-Path $candidate "backend\dist\index.js"
+  if (Test-Path -Path $entry) { return $candidate }
+
+  $installed = Join-Path $scriptRoot "DLT"
+  $installedEntry = Join-Path $installed "backend\dist\index.js"
+  if (Test-Path -Path $installedEntry) { return $installed }
+
+  $latestZip = Join-Path $scriptRoot "DLT-offline-latest.zip"
+  $zip = $null
+  if (Test-Path -Path $latestZip) {
+    $zip = $latestZip
+  } else {
+    $newest = Get-ChildItem -Path $scriptRoot -Filter "DLT-offline-*.zip" -ErrorAction SilentlyContinue |
+      Sort-Object LastWriteTime -Descending |
+      Select-Object -First 1
+    if ($newest) { $zip = $newest.FullName }
+  }
+
+  if (-not $zip) {
+    throw "No app folder found and no DLT-offline zip found next to run.ps1. Put run.ps1 next to DLT-offline-latest.zip, or run it from inside an extracted bundle folder."
+  }
+
+  if (-not (Test-Path -Path $installed)) {
+    New-Item -ItemType Directory -Force -Path $installed | Out-Null
+  }
+
+  Write-Host "Extracting bundle to: $installed" -ForegroundColor Cyan
+  Expand-Archive -Path $zip -DestinationPath $installed -Force
+
+  if (-not (Test-Path -Path $installedEntry)) {
+    throw "Extract completed but backend entrypoint not found at $installedEntry. This zip may not be a valid DLT offline bundle."
+  }
+  return $installed
+}
+
+$appRoot = Get-AppRoot -scriptRoot $root
+
 # Prefer a bundled portable Node if present; otherwise fall back to system node.
 $nodeCandidates = @(
   (Join-Path $root "node\\node.exe"),
   (Join-Path $root "runtime\\node\\node.exe"),
-  (Join-Path $root "tools\\node\\node.exe")
+  (Join-Path $root "tools\\node\\node.exe"),
+  (Join-Path $appRoot "node\\node.exe"),
+  (Join-Path $appRoot "runtime\\node\\node.exe"),
+  (Join-Path $appRoot "tools\\node\\node.exe")
 )
 
 $nodeExe = $null
@@ -45,8 +88,8 @@ if (-not $nodeExe) {
   exit 1
 }
 
-# Load or create local env (session secret).
-$localEnv = Join-Path $root "local.env.ps1"
+# Load or create local env (session secret) in the app folder.
+$localEnv = Join-Path $appRoot "local.env.ps1"
 if (Test-Path -Path $localEnv) {
   . $localEnv
 }
@@ -64,7 +107,7 @@ if ([string]::IsNullOrWhiteSpace($env:DLT_SESSION_SECRET) -or $env:DLT_SESSION_S
 $env:PORT = "$Port"
 $env:HOST = $HostAddress
 
-$backendDir = Join-Path $root "backend"
+$backendDir = Join-Path $appRoot "backend"
 $entry = Join-Path $backendDir "dist\\index.js"
 if (-not (Test-Path -Path $entry)) {
   Write-Error "Missing backend\\dist\\index.js. This doesn't look like a built offline bundle."

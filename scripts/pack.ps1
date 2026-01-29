@@ -15,6 +15,19 @@ function Invoke-Step([string]$Title, [scriptblock]$Action) {
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot ".." )).Path
 Set-Location $repoRoot
 
+Invoke-Step "Clean output folder" {
+  $outPath = Join-Path $repoRoot $OutDir
+  New-Item -ItemType Directory -Force -Path $outPath | Out-Null
+
+  # Only remove previous bundle artifacts; do not touch unrelated files.
+  Get-ChildItem -Path $outPath -Filter "DLT-offline-*.zip" -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+  Get-ChildItem -Path $outPath -Filter "DLT-offline-*" -Directory -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+  @("DLT-offline-latest.zip", "install-offline.ps1", "run.ps1") | ForEach-Object {
+    $p = Join-Path $outPath $_
+    if (Test-Path -Path $p) { Remove-Item -Force $p }
+  }
+}
+
 Invoke-Step "Validate config.json" {
   $cfgPath = Join-Path $repoRoot "config.json"
   if (-not (Test-Path $cfgPath)) { throw "config.json not found at repo root." }

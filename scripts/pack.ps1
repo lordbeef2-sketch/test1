@@ -19,13 +19,8 @@ Invoke-Step "Clean output folder" {
   $outPath = Join-Path $repoRoot $OutDir
   New-Item -ItemType Directory -Force -Path $outPath | Out-Null
 
-  # Only remove previous bundle artifacts; do not touch unrelated files.
-  Get-ChildItem -Path $outPath -Filter "DLT-offline-*.zip" -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
-  Get-ChildItem -Path $outPath -Filter "DLT-offline-*" -Directory -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-  @("DLT-offline-latest.zip", "install-offline.ps1", "run.ps1") | ForEach-Object {
-    $p = Join-Path $outPath $_
-    if (Test-Path -Path $p) { Remove-Item -Force $p }
-  }
+  # This folder is an output-only artifact folder. Wipe it.
+  Get-ChildItem -Path $outPath -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 Invoke-Step "Validate config.json" {
@@ -57,6 +52,17 @@ Invoke-Step "Create stable latest zip name" {
   if (-not $newest) { throw "No bundle zip found in $outPath" }
   Copy-Item -Force -Path $newest.FullName -Destination $latestZip
   Write-Host "Latest: $latestZip" -ForegroundColor Green
+}
+
+Invoke-Step "Remove staging output" {
+  $outPath = Join-Path $repoRoot $OutDir
+  # Keep only the stable zip; remove timestamp zips and staging folders.
+  Get-ChildItem -Path $outPath -Filter "DLT-offline-*.zip" -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -ne "DLT-offline-latest.zip" } |
+    Remove-Item -Force -ErrorAction SilentlyContinue
+
+  Get-ChildItem -Path $outPath -Filter "DLT-offline-*" -Directory -ErrorAction SilentlyContinue |
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 Invoke-Step "Copy installer next to zip" {

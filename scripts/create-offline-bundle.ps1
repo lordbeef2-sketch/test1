@@ -112,6 +112,12 @@ try {
   Set-Content -Path (Join-Path $stageDir "start-backend.ps1") -Value $startScript -Encoding UTF8
 }
 
+Invoke-Step "Copy one-click run script" {
+  if (Test-Path (Join-Path $repoRoot "scripts\run.ps1")) {
+    Copy-Item -Force -Path (Join-Path $repoRoot "scripts\run.ps1") -Destination $stageDir
+  }
+}
+
 Invoke-Step "Write offline instructions" {
   $doc = @'
 # DLT Offline Bundle
@@ -124,7 +130,7 @@ This bundle contains:
 ## Run
 1) Extract the zip somewhere (e.g. `C:\DLT`)
 2) Run PowerShell:
-   - `./start-backend.ps1` (defaults to localhost:9191)
+  - `./run.ps1` (one-click, relative paths, defaults to localhost:9191)
 
 ## Requirements
 - The machine running the backend must have Active Directory access (domain-joined and able to reach a DC).

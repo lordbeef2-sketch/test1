@@ -49,5 +49,6 @@ Invoke-Step "Create stable latest zip name" {
 Invoke-Step "Copy installer next to zip" {
   $outPath = Join-Path $repoRoot $OutDir
   Copy-Item -Force -Path (Join-Path $repoRoot "scripts\install-offline.ps1") -Destination (Join-Path $outPath "install-offline.ps1")
+  Copy-Item -Force -Path (Join-Path $repoRoot "scripts\run.ps1") -Destination (Join-Path $outPath "run.ps1")
   Write-Host "Installer: $(Join-Path $outPath 'install-offline.ps1')" -ForegroundColor Green
 }

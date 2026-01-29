@@ -1,11 +1,18 @@
 [CmdletBinding()]
 param(
   [string]$ZipPath = "./DLT-offline-latest.zip",
-  [string]$InstallDir = "C:\DLT",
+  [string]$InstallDir = "",
   [switch]$NoStart
 )
 
 $ErrorActionPreference = "Stop"
+
+if ([string]::IsNullOrWhiteSpace($InstallDir)) {
+  # Default to a relative install folder next to this script (or current dir if unknown).
+  $base = $PSScriptRoot
+  if ([string]::IsNullOrWhiteSpace($base)) { $base = (Get-Location).Path }
+  $InstallDir = Join-Path $base "DLT"
+}
 
 function Write-Step([string]$Title) {
   Write-Host "==> $Title" -ForegroundColor Cyan
@@ -68,7 +75,7 @@ if (-not (Test-Path $localEnv)) {
 
 Write-Host "" 
 Write-Host "Installed to: $appRoot" -ForegroundColor Green
-Write-Host "Next: run .\\start-backend.ps1" -ForegroundColor Green
+Write-Host "Next: run .\\run.ps1" -ForegroundColor Green
 
 if (-not $NoStart) {
   Write-Step "Starting backend"
